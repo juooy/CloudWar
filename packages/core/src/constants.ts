@@ -15,3 +15,18 @@ export const VAPOR_MAX = 600;
 export const VAPOR_SPAWN_PER_TICK = 3;
 export const VAPOR_RADIUS = 6;
 export const INITIAL_VAPOR_COUNT = 400; // 라운드 시작 시 맵에 깔리는 수증기
+
+// ─── 전투 ───
+export const MIN_MASS = 20; // 이하로 떨어지면 사망. 공식(cloudRadius/cloudSpeed)의 질량 하한이기도 함
+export const ABSORB_RATIO = 1.25; // 같은 극성: 이 배율 이상 크면 흡수
+export const SWAP_COST_RATIO = 0.15; // 극성 스왑 비용 (질량 비율)
+export const SWAP_COOLDOWN_TICKS = 200; // 10초 @ 20tick
+export const LIGHTNING_DRAIN_PER_SEC = 0.08; // 완전 겹침 시 초당 자기 질량 손실 비율
+export const DROPLET_RATIO = 0.3; // 번개 손실 중 물방울로 튀는 비율
+export const DROPLET_SCATTER = 120; // 물방울이 흩어지는 반경 (월드 유닛)
+export const RESPAWN_TICKS = 60; // 3초
+export const SHIELD_TICKS = 200; // 10초 스폰 보호막
+
+// ─── 봇 ───
+export const BOT_COUNT = 7; // 봇 모드: 플레이어 1 + 봇 7 = 8구름
+export const BOT_VIEW_RADIUS = 900; // 봇 시야 반경
