@@ -3,6 +3,8 @@ import {
   RESPAWN_TICKS,
   SHIELD_TICKS,
   START_MASS,
+  SWAP_COOLDOWN_TICKS,
+  SWAP_COST_RATIO,
   VAPOR_MASS,
   VAPOR_MAX,
   VAPOR_SPAWN_PER_TICK,
@@ -21,6 +23,7 @@ import { spawnVapor } from './vapor';
 export function simulate(state: GameState, inputs: Inputs, dt: number): GameState {
   state.events = [];
   tickTimers(state);
+  applySwaps(state, inputs);
   moveClouds(state, inputs, dt);
   applyDeaths(state);
   absorbVapors(state);
@@ -37,6 +40,18 @@ function tickTimers(state: GameState): void {
       cloud.respawnTicks -= 1;
       if (cloud.respawnTicks === 0) respawn(state, cloud);
     }
+  }
+}
+
+function applySwaps(state: GameState, inputs: Inputs): void {
+  for (const cloud of state.clouds) {
+    if (!isAlive(cloud)) continue;
+    const input = inputs[cloud.id];
+    if (!input?.swap || cloud.swapCooldown > 0) continue;
+    cloud.polarity = cloud.polarity === 1 ? -1 : 1;
+    cloud.mass *= 1 - SWAP_COST_RATIO;
+    cloud.swapCooldown = SWAP_COOLDOWN_TICKS;
+    state.events.push({ type: 'swap', cloudId: cloud.id, pos: { ...cloud.pos } });
   }
 }
 
