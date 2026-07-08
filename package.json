@@ -1,0 +1,9 @@
+{
+  "name": "cloudwar",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @cloudwar/client dev",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
