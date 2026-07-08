@@ -8,6 +8,19 @@ importers:
 
   .: {}
 
+  packages/client:
+    dependencies:
+      '@cloudwar/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.6
+
   packages/core:
     devDependencies:
       typescript:
