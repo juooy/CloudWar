@@ -5,8 +5,8 @@ import {
   WORLD_SIZE,
 } from './constants';
 import { cloudRadius, cloudSpeed } from './cloud';
-import { rand } from './rng';
 import type { GameState, Inputs } from './types';
+import { spawnVapor } from './vapor';
 
 /**
  * 고정 타임스텝 시뮬레이션 틱. 전달된 state를 제자리 변이하고 반환한다.
@@ -53,12 +53,6 @@ function absorbVapors(state: GameState): void {
 function spawnVapors(state: GameState): void {
   for (let i = 0; i < VAPOR_SPAWN_PER_TICK; i++) {
     if (state.vapors.length >= VAPOR_MAX) return;
-    state.vapors.push({
-      id: state.nextEntityId++,
-      pos: {
-        x: rand(state) * WORLD_SIZE,
-        y: rand(state) * WORLD_SIZE,
-      },
-    });
+    spawnVapor(state);
   }
 }

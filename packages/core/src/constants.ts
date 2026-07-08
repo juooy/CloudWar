@@ -11,6 +11,7 @@ export const SPEED_EXPONENT = 0.3; // 속도 = BASE_SPEED * (START_MASS/질량)^
 
 // ─── 수증기 ───
 export const VAPOR_MASS = 5;
-export const VAPOR_MAX = 200;
-export const VAPOR_SPAWN_PER_TICK = 1;
+export const VAPOR_MAX = 600;
+export const VAPOR_SPAWN_PER_TICK = 3;
 export const VAPOR_RADIUS = 6;
+export const INITIAL_VAPOR_COUNT = 400; // 라운드 시작 시 맵에 깔리는 수증기

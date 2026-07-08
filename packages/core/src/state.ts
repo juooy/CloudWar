@@ -1,8 +1,9 @@
-import { START_MASS, WORLD_SIZE } from './constants';
+import { INITIAL_VAPOR_COUNT, START_MASS, WORLD_SIZE } from './constants';
 import type { GameState } from './types';
+import { spawnVapor } from './vapor';
 
 export function createInitialState(seed: number): GameState {
-  return {
+  const state: GameState = {
     tick: 0,
     rngState: seed | 0,
     nextEntityId: 2,
@@ -15,4 +16,6 @@ export function createInitialState(seed: number): GameState {
     ],
     vapors: [],
   };
+  for (let i = 0; i < INITIAL_VAPOR_COUNT; i++) spawnVapor(state);
+  return state;
 }

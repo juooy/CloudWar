@@ -9,18 +9,34 @@ import {
   VAPOR_MAX,
   VAPOR_SPAWN_PER_TICK,
 } from '../src/constants';
+import type { GameState } from '../src/types';
+
+/** 스폰 로직만 관찰하기 위해 구름·초기 수증기를 비운 상태 */
+function emptyWorld(seed: number): GameState {
+  const state = createInitialState(seed);
+  state.clouds = [];
+  state.vapors = [];
+  return state;
+}
 
 describe('수증기 스폰', () => {
-  it('틱마다 VAPOR_SPAWN_PER_TICK개씩 VAPOR_MAX까지 스폰된다', () => {
-    const state = createInitialState(42);
+  it('틱마다 VAPOR_SPAWN_PER_TICK개씩 스폰된다', () => {
+    const state = emptyWorld(42);
     simulate(state, {}, DT);
     expect(state.vapors).toHaveLength(VAPOR_SPAWN_PER_TICK);
-    for (let i = 0; i < VAPOR_MAX * 2; i++) simulate(state, {}, DT);
-    expect(state.vapors.length).toBeLessThanOrEqual(VAPOR_MAX);
+    simulate(state, {}, DT);
+    expect(state.vapors).toHaveLength(VAPOR_SPAWN_PER_TICK * 2);
+  });
+
+  it('VAPOR_MAX를 넘지 않는다', () => {
+    const state = emptyWorld(42);
+    const enoughTicks = Math.ceil(VAPOR_MAX / VAPOR_SPAWN_PER_TICK) + 50;
+    for (let i = 0; i < enoughTicks; i++) simulate(state, {}, DT);
+    expect(state.vapors).toHaveLength(VAPOR_MAX);
   });
 
   it('스폰 위치는 월드 범위 안이다', () => {
-    const state = createInitialState(42);
+    const state = emptyWorld(42);
     for (let i = 0; i < 100; i++) simulate(state, {}, DT);
     for (const v of state.vapors) {
       expect(v.pos.x).toBeGreaterThanOrEqual(0);
@@ -30,7 +46,7 @@ describe('수증기 스폰', () => {
     }
   });
 
-  it('수증기 id는 중복되지 않는다', () => {
+  it('수증기 id는 초기 배치·스폰을 통틀어 중복되지 않는다', () => {
     const state = createInitialState(42);
     for (let i = 0; i < 50; i++) simulate(state, {}, DT);
     const ids = state.vapors.map((v) => v.id);
