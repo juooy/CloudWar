@@ -1,4 +1,5 @@
 import {
+  ABSORB_RATIO,
   MIN_MASS,
   RESPAWN_TICKS,
   SHIELD_TICKS,
@@ -18,13 +19,14 @@ import { spawnVapor } from './vapor';
 /**
  * 고정 타임스텝 시뮬레이션 틱. 전달된 state를 제자리 변이하고 반환한다.
  * 외부 부수효과 없음 — 결정론은 state 내장 RNG로 보장된다.
- * 순서: events 초기화 → 타이머 → 이동 → 사망 판정 → 흡수 → 스폰 → tick 증가.
+ * 순서: events 초기화 → 타이머 → 스왑 → 이동 → 전투 → 사망 판정 → 흡수 → 스폰 → tick 증가.
  */
 export function simulate(state: GameState, inputs: Inputs, dt: number): GameState {
   state.events = [];
   tickTimers(state);
   applySwaps(state, inputs);
   moveClouds(state, inputs, dt);
+  cloudCombat(state, dt);
   applyDeaths(state);
   absorbVapors(state);
   spawnVapors(state);
@@ -90,6 +92,61 @@ function moveClouds(state: GameState, inputs: Inputs, dt: number): void {
     cloud.pos.y += (input.dir.y / len) * speed * dt;
     clampToWorld(cloud);
   }
+}
+
+function cloudCombat(state: GameState, dt: number): void {
+  const clouds = state.clouds;
+  for (let i = 0; i < clouds.length; i++) {
+    for (let j = i + 1; j < clouds.length; j++) {
+      const a = clouds[i]!;
+      const b = clouds[j]!;
+      if (!isAlive(a) || !isAlive(b)) continue;
+      if (a.shieldTicks > 0 || b.shieldTicks > 0) continue;
+      const ra = cloudRadius(a.mass);
+      const rb = cloudRadius(b.mass);
+      const dist = Math.hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y);
+      if (dist >= ra + rb) continue;
+      if (a.polarity === b.polarity) {
+        samePolarityContact(state, a, b, ra, rb, dist);
+      }
+      // 반대 극성(번개)은 Task 6에서 채운다
+    }
+  }
+}
+
+function samePolarityContact(
+  state: GameState,
+  a: Cloud,
+  b: Cloud,
+  ra: number,
+  rb: number,
+  dist: number,
+): void {
+  const [big, small] = a.mass >= b.mass ? [a, b] : [b, a];
+  if (big.mass >= small.mass * ABSORB_RATIO && dist < cloudRadius(big.mass)) {
+    big.mass += small.mass;
+    state.events.push({ type: 'absorb', cloudId: big.id, otherId: small.id, pos: { ...small.pos } });
+    kill(state, small);
+    return;
+  }
+  // 밀어내기 — 겹침을 질량 반비례로 해소 (무거운 쪽이 덜 밀림)
+  const overlap = ra + rb - dist;
+  let nx: number;
+  let ny: number;
+  if (dist > 0) {
+    nx = (a.pos.x - b.pos.x) / dist;
+    ny = (a.pos.y - b.pos.y) / dist;
+  } else {
+    nx = a.id < b.id ? -1 : 1; // 완전히 겹치면 id 기준 결정적 분리
+    ny = 0;
+  }
+  const total = a.mass + b.mass;
+  a.pos.x += nx * overlap * (b.mass / total);
+  a.pos.y += ny * overlap * (b.mass / total);
+  b.pos.x -= nx * overlap * (a.mass / total);
+  b.pos.y -= ny * overlap * (a.mass / total);
+  clampToWorld(a);
+  clampToWorld(b);
 }
 
 function clampToWorld(cloud: Cloud): void {
