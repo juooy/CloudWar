@@ -3,6 +3,9 @@ import type { Vec2 } from '@cloudwar/core';
 import { MouseInput } from './input';
 import { Camera } from './camera';
 import { render } from './render';
+import { generateCloudStyle } from './cloudStyle';
+import type { CloudStyle } from './cloudStyle';
+import { showStartScreen } from './startScreen';
 
 const PLAYER_ID = 1;
 const MAX_FRAME_SECONDS = 0.25; // 탭 비활성 복귀 시 시뮬 폭주 방지
@@ -17,25 +20,42 @@ function resize(): void {
 window.addEventListener('resize', resize);
 resize();
 
-const state = createInitialState(Date.now() >>> 0); // 시드는 core 밖(여기)에서만 생성
-const input = new MouseInput(document.body);
-const camera = new Camera();
-
-let prevPositions = new Map<number, Vec2>();
-let last = performance.now();
-let accumulator = 0;
-
-function frame(now: number): void {
-  accumulator = Math.min(accumulator + (now - last) / 1000, MAX_FRAME_SECONDS);
-  last = now;
-
-  while (accumulator >= DT) {
-    prevPositions = new Map(state.clouds.map((c) => [c.id, { ...c.pos }]));
-    simulate(state, { [PLAYER_ID]: { dir: input.currentDir() } }, DT);
-    accumulator -= DT;
+/** 구름 id → 비주얼 스타일. 플레이어는 시작 화면에서 고른 것, 그 외(봇 등)는 id 시드로 자동 생성. */
+const styleCache = new Map<number, CloudStyle>();
+function getStyle(id: number): CloudStyle {
+  let style = styleCache.get(id);
+  if (!style) {
+    style = generateCloudStyle({ seed: id * 2654435761, lobeCount: 5, fluff: 1 });
+    styleCache.set(id, style);
   }
+  return style;
+}
 
-  render(ctx, canvas, state, prevPositions, accumulator / DT, camera, PLAYER_ID);
+async function start(): Promise<void> {
+  const playerStyle = await showStartScreen();
+  styleCache.set(PLAYER_ID, playerStyle);
+
+  const state = createInitialState(Date.now() >>> 0); // 시드는 core 밖(여기)에서만 생성
+  const input = new MouseInput(document.body);
+  const camera = new Camera();
+
+  let prevPositions = new Map<number, Vec2>();
+  let last = performance.now();
+  let accumulator = 0;
+
+  function frame(now: number): void {
+    accumulator = Math.min(accumulator + (now - last) / 1000, MAX_FRAME_SECONDS);
+    last = now;
+
+    while (accumulator >= DT) {
+      prevPositions = new Map(state.clouds.map((c) => [c.id, { ...c.pos }]));
+      simulate(state, { [PLAYER_ID]: { dir: input.currentDir() } }, DT);
+      accumulator -= DT;
+    }
+
+    render(ctx, canvas, state, prevPositions, accumulator / DT, camera, PLAYER_ID, getStyle, now / 1000);
+    requestAnimationFrame(frame);
+  }
   requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+void start();
