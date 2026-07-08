@@ -1,5 +1,8 @@
 import {
   ABSORB_RATIO,
+  DROPLET_RATIO,
+  DROPLET_SCATTER,
+  LIGHTNING_DRAIN_PER_SEC,
   MIN_MASS,
   RESPAWN_TICKS,
   SHIELD_TICKS,
@@ -13,7 +16,7 @@ import {
 } from './constants';
 import { cloudRadius, cloudSpeed, isAlive } from './cloud';
 import { rand } from './rng';
-import type { Cloud, GameState, Inputs } from './types';
+import type { Cloud, GameState, Inputs, Vec2 } from './types';
 import { spawnVapor } from './vapor';
 
 /**
@@ -108,8 +111,9 @@ function cloudCombat(state: GameState, dt: number): void {
       if (dist >= ra + rb) continue;
       if (a.polarity === b.polarity) {
         samePolarityContact(state, a, b, ra, rb, dist);
+      } else {
+        lightningContact(state, a, b, ra, rb, dist, dt);
       }
-      // 반대 극성(번개)은 Task 6에서 채운다
     }
   }
 }
@@ -147,6 +151,44 @@ function samePolarityContact(
   b.pos.y -= ny * overlap * (a.mass / total);
   clampToWorld(a);
   clampToWorld(b);
+}
+
+function lightningContact(
+  state: GameState,
+  a: Cloud,
+  b: Cloud,
+  ra: number,
+  rb: number,
+  dist: number,
+  dt: number,
+): void {
+  const overlap = ra + rb - dist;
+  const factor = Math.min(1, overlap / Math.min(ra, rb));
+  const drainA = a.mass * LIGHTNING_DRAIN_PER_SEC * dt * factor;
+  const drainB = b.mass * LIGHTNING_DRAIN_PER_SEC * dt * factor;
+  a.mass -= drainA;
+  b.mass -= drainB;
+  const mid = { x: (a.pos.x + b.pos.x) / 2, y: (a.pos.y + b.pos.y) / 2 };
+  scatterDroplets(state, mid, (drainA + drainB) * DROPLET_RATIO);
+  state.events.push({ type: 'lightning', cloudId: a.id, otherId: b.id, pos: mid });
+}
+
+/** 번개 손실 일부를 물방울(수증기)로 흩뿌린다. VAPOR_MAX 캡 무시 — 전투 보상은 일반 스폰과 별개. */
+function scatterDroplets(state: GameState, origin: Vec2, mass: number): void {
+  const expected = mass / VAPOR_MASS;
+  let count = Math.floor(expected);
+  if (rand(state) < expected - count) count += 1; // 소수부는 확률 스폰 (시드 RNG라 결정적)
+  for (let i = 0; i < count; i++) {
+    const angle = rand(state) * Math.PI * 2;
+    const scatter = rand(state) * DROPLET_SCATTER;
+    state.vapors.push({
+      id: state.nextEntityId++,
+      pos: {
+        x: Math.min(Math.max(origin.x + Math.cos(angle) * scatter, 0), WORLD_SIZE),
+        y: Math.min(Math.max(origin.y + Math.sin(angle) * scatter, 0), WORLD_SIZE),
+      },
+    });
+  }
 }
 
 function clampToWorld(cloud: Cloud): void {
