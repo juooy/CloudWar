@@ -5,10 +5,13 @@ import type { Camera } from './camera';
 interface LightningFx { kind: 'lightning'; a: Vec2; b: Vec2; jitter: number[]; ttl: number; age: number; }
 interface RingFx { kind: 'ring'; pos: Vec2; color: string; maxR: number; ttl: number; age: number; }
 interface PuffFx { kind: 'puff'; pos: Vec2; angles: number[]; ttl: number; age: number; }
-type Fx = LightningFx | RingFx | PuffFx;
+/** 전투로 뜯겨나가는 구름 조각 — 속도를 갖고 날아가며 사그라든다 */
+interface ChunkFx { kind: 'chunk'; pos: Vec2; vx: number; vy: number; r: number; ttl: number; age: number; }
+type Fx = LightningFx | RingFx | PuffFx | ChunkFx;
 
 const SHAKE_DURATION = 0.25;
 const SHAKE_AMP = 7;
+const CRUSH_SHAKE_DURATION = 0.15;
 
 /** state.events를 화면 이펙트로 변환·수명 관리. 렌더 전용 — 시뮬레이션에 영향 없음. */
 export class EffectsManager {
@@ -23,8 +26,15 @@ export class EffectsManager {
         // 볼트 지그재그 오프셋 (렌더 전용이라 Math.random 허용)
         const jitter = Array.from({ length: 4 }, () => (Math.random() - 0.5) * 40);
         this.fx.push({ kind: 'lightning', a: { ...a.pos }, b: { ...b.pos }, jitter, ttl: 0.18, age: 0 });
+        // 양쪽 구름에서 조각이 뜯겨나간다 — 번개가 "깎아내는" 체감
+        this.spawnChunks(a.pos, cloudRadius(a.mass), 2);
+        this.spawnChunks(b.pos, cloudRadius(b.mass), 2);
       }
       if (ev.cloudId === playerId || ev.otherId === playerId) this.shakeTime = SHAKE_DURATION;
+    } else if (ev.type === 'crush') {
+      // 벽 압착 — 눌린 지점에서 조각이 튀어나온다
+      this.spawnChunks(ev.pos, 30, 3);
+      if (ev.cloudId === playerId) this.shakeTime = Math.max(this.shakeTime, CRUSH_SHAKE_DURATION);
     } else if (ev.type === 'absorb') {
       this.fx.push({ kind: 'ring', pos: { ...ev.pos }, color: 'rgba(255, 255, 255, 0.9)', maxR: 90, ttl: 0.4, age: 0 });
     } else if (ev.type === 'swap') {
@@ -36,6 +46,26 @@ export class EffectsManager {
       this.fx.push({ kind: 'puff', pos: { ...ev.pos }, angles, ttl: 0.6, age: 0 });
     } else if (ev.type === 'respawn' && ev.cloudId === playerId) {
       this.fx.push({ kind: 'ring', pos: { ...ev.pos }, color: 'rgba(255, 255, 255, 0.7)', maxR: 120, ttl: 0.5, age: 0 });
+    }
+  }
+
+  /** 구름 가장자리에서 바깥으로 날아가는 조각들 */
+  private spawnChunks(origin: Vec2, radius: number, count: number): void {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 120 + Math.random() * 140;
+      this.fx.push({
+        kind: 'chunk',
+        pos: {
+          x: origin.x + Math.cos(angle) * radius * 0.7,
+          y: origin.y + Math.sin(angle) * radius * 0.7,
+        },
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed + 50, // 살짝 아래로 떨어지는 느낌
+        r: 5 + Math.random() * 9,
+        ttl: 0.55,
+        age: 0,
+      });
     }
   }
 
@@ -77,6 +107,15 @@ export class EffectsManager {
         ctx.beginPath();
         ctx.arc(s.x, s.y, f.maxR * progress, 0, Math.PI * 2);
         ctx.stroke();
+      } else if (f.kind === 'chunk') {
+        const s = camera.worldToScreen(
+          { x: f.pos.x + f.vx * f.age, y: f.pos.y + f.vy * f.age },
+          canvas,
+        );
+        ctx.fillStyle = `rgba(245, 250, 255, ${(1 - progress) * 0.9})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, f.r * (1 - progress * 0.5), 0, Math.PI * 2);
+        ctx.fill();
       } else {
         const s = camera.worldToScreen(f.pos, canvas);
         ctx.fillStyle = `rgba(255, 255, 255, ${(1 - progress) * 0.8})`;
