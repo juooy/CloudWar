@@ -5,3 +5,4 @@ export * from './cloud';
 export * from './state';
 export * from './simulate';
 export * from './vapor';
+export * from './bots';

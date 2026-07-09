@@ -1,17 +1,25 @@
+import type { Polarity } from '@cloudwar/core';
 import { drawCloud } from './render';
 import { generateCloudStyle, randomSeed } from './cloudStyle';
 import type { CloudStyle, CloudStyleParams } from './cloudStyle';
 
 const STORAGE_KEY = 'cloudwar.cloudStyle';
 
-/** 시작 화면을 띄우고, "게임 시작" 클릭 시 확정된 구름 스타일로 resolve한다. */
-export function showStartScreen(): Promise<CloudStyle> {
+export interface StartChoice {
+  style: CloudStyle;
+  polarity: Polarity;
+}
+
+/** 시작 화면을 띄우고, "게임 시작" 클릭 시 확정된 구름 스타일·극성으로 resolve한다. */
+export function showStartScreen(): Promise<StartChoice> {
   const overlay = document.getElementById('start-screen') as HTMLDivElement;
   const preview = document.getElementById('style-preview') as HTMLCanvasElement;
   const lobesInput = document.getElementById('style-lobes') as HTMLInputElement;
   const fluffInput = document.getElementById('style-fluff') as HTMLInputElement;
   const rerollBtn = document.getElementById('style-reroll') as HTMLButtonElement;
   const startBtn = document.getElementById('start-game') as HTMLButtonElement;
+  const plusBtn = document.getElementById('polarity-plus') as HTMLButtonElement;
+  const minusBtn = document.getElementById('polarity-minus') as HTMLButtonElement;
   const ctx = preview.getContext('2d')!;
 
   const params = loadParams();
@@ -19,6 +27,7 @@ export function showStartScreen(): Promise<CloudStyle> {
   fluffInput.value = String(params.fluff);
 
   let style = generateCloudStyle(params);
+  let polarity: Polarity = 1;
   let running = true;
 
   lobesInput.addEventListener('input', () => {
@@ -33,11 +42,21 @@ export function showStartScreen(): Promise<CloudStyle> {
     params.seed = randomSeed();
     style = generateCloudStyle(params);
   });
+  plusBtn.addEventListener('click', () => {
+    polarity = 1;
+    plusBtn.classList.add('selected');
+    minusBtn.classList.remove('selected');
+  });
+  minusBtn.addEventListener('click', () => {
+    polarity = -1;
+    minusBtn.classList.add('selected');
+    plusBtn.classList.remove('selected');
+  });
 
   function drawPreview(now: number): void {
     if (!running) return;
     ctx.clearRect(0, 0, preview.width, preview.height);
-    drawCloud(ctx, { x: preview.width / 2, y: preview.height / 2 + 12 }, 55, style, now / 1000);
+    drawCloud(ctx, { x: preview.width / 2, y: preview.height / 2 + 12 }, 55, style, now / 1000, polarity, false);
     requestAnimationFrame(drawPreview);
   }
   requestAnimationFrame(drawPreview);
@@ -53,7 +72,7 @@ export function showStartScreen(): Promise<CloudStyle> {
           // 저장 실패해도 게임 시작에는 지장 없음
         }
         overlay.style.display = 'none';
-        resolve(style);
+        resolve({ style, polarity });
       },
       { once: true },
     );
