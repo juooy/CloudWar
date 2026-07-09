@@ -27,7 +27,7 @@ describe('통합 — 봇 매치 완주', () => {
         expect(Number.isFinite(c.mass)).toBe(true);
         expect(c.pos.x).toBeGreaterThanOrEqual(0);
         expect(c.pos.x).toBeLessThanOrEqual(WORLD_SIZE);
-        if (c.respawnTicks === 0) expect(c.mass).toBeGreaterThanOrEqual(MIN_MASS * 0.5);
+        if (c.respawnTicks === 0) expect(c.mass).toBeGreaterThanOrEqual(MIN_MASS);
       }
     }
     // 수증기 id 유일성 (전투 물방울 포함)
