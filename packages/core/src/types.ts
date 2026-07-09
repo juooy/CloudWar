@@ -34,7 +34,7 @@ export interface PlayerInput {
 /** cloudId → 해당 틱의 입력 */
 export type Inputs = Record<number, PlayerInput | undefined>;
 
-export type GameEventType = 'lightning' | 'absorb' | 'death' | 'respawn' | 'swap';
+export type GameEventType = 'lightning' | 'absorb' | 'death' | 'respawn' | 'swap' | 'crush';
 
 /** 직전 틱에 일어난 일 — 클라 이펙트 전용. 매 틱 초기화된다. */
 export interface GameEvent {

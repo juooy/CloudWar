@@ -35,7 +35,7 @@ describe('봇 AI', () => {
     expect(headsToward(inputs[2]!.dir, bot.pos, prey.pos)).toBe(true);
   });
 
-  it('두 배 이상 큰 반대 극성에게서는 도망간다', () => {
+  it('2.5배 이상 큰 반대 극성에게서는 도망간다 (스왑 없이 — 스왑하면 먹힐 극성이 된다)', () => {
     const state = arena();
     const bot = createCloud(2, { x: 2000, y: 2000 }, 1, true);
     const enemy = createCloud(3, { x: 2100, y: 2000 }, -1, true);
@@ -43,6 +43,62 @@ describe('봇 AI', () => {
     state.clouds.push(bot, enemy);
     const inputs = computeBotInputs(state);
     expect(headsToward(inputs[2]!.dir, bot.pos, enemy.pos)).toBe(false);
+    expect(inputs[2]!.swap).toBeFalsy();
+  });
+
+  it('2.5배 미만의 반대 극성은 위협으로 보지 않는다', () => {
+    const state = arena();
+    const bot = createCloud(2, { x: 2000, y: 2000 }, 1, true);
+    const enemy = createCloud(3, { x: 2100, y: 2000 }, -1, true);
+    enemy.mass = 220; // < 250 = 2.5배
+    state.clouds.push(bot, enemy);
+    state.vapors = [{ id: 10, pos: { x: 2150, y: 2000 } }]; // 적과 같은 방향
+    const inputs = computeBotInputs(state);
+    expect(headsToward(inputs[2]!.dir, bot.pos, { x: 2150, y: 2000 })).toBe(true);
+  });
+
+  it('충분히 크면(1.6배 이상) 반대 극성을 번개 사냥한다', () => {
+    const state = arena();
+    const bot = createCloud(2, { x: 2000, y: 2000 }, 1, true);
+    bot.mass = 200;
+    const target = createCloud(3, { x: 2300, y: 2000 }, -1, true);
+    target.mass = 100;
+    state.clouds.push(bot, target);
+    const inputs = computeBotInputs(state);
+    expect(headsToward(inputs[2]!.dir, bot.pos, target.pos)).toBe(true);
+  });
+
+  it('같은 극성 포식자가 코앞이면 도망치며 긴급 스왑한다', () => {
+    const state = arena();
+    const bot = createCloud(2, { x: 2000, y: 2000 }, 1, true);
+    const threat = createCloud(3, { x: 2100, y: 2000 }, 1, true); // 거리 100 < BOT_PANIC_RADIUS
+    threat.mass = 300;
+    state.clouds.push(bot, threat);
+    const inputs = computeBotInputs(state);
+    expect(inputs[2]!.swap).toBe(true);
+    expect(headsToward(inputs[2]!.dir, bot.pos, threat.pos)).toBe(false);
+  });
+
+  it('스왑 쿨다운 중에는 긴급 스왑하지 않는다', () => {
+    const state = arena();
+    const bot = createCloud(2, { x: 2000, y: 2000 }, 1, true);
+    bot.swapCooldown = 50;
+    const threat = createCloud(3, { x: 2100, y: 2000 }, 1, true);
+    threat.mass = 300;
+    state.clouds.push(bot, threat);
+    const inputs = computeBotInputs(state);
+    expect(inputs[2]!.swap).toBeFalsy();
+  });
+
+  it('포식자가 멀면(패닉 반경 밖) 스왑 없이 도망만 간다', () => {
+    const state = arena();
+    const bot = createCloud(2, { x: 2000, y: 2000 }, 1, true);
+    const threat = createCloud(3, { x: 2500, y: 2000 }, 1, true); // 거리 500 > BOT_PANIC_RADIUS
+    threat.mass = 300;
+    state.clouds.push(bot, threat);
+    const inputs = computeBotInputs(state);
+    expect(inputs[2]!.swap).toBeFalsy();
+    expect(headsToward(inputs[2]!.dir, bot.pos, threat.pos)).toBe(false);
   });
 
   it('위협도 사냥감도 없으면 가장 가까운 수증기로 간다', () => {

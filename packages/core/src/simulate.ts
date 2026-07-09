@@ -12,6 +12,7 @@ import {
   VAPOR_MASS,
   VAPOR_MAX,
   VAPOR_SPAWN_PER_TICK,
+  WALL_CRUSH_RATE_PER_SEC,
   WORLD_SIZE,
 } from './constants';
 import { cloudRadius, cloudSpeed, isAlive } from './cloud';
@@ -110,7 +111,7 @@ function cloudCombat(state: GameState, dt: number): void {
       const dist = Math.hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y);
       if (dist >= ra + rb) continue;
       if (a.polarity === b.polarity) {
-        samePolarityContact(state, a, b, ra, rb, dist);
+        samePolarityContact(state, a, b, ra, rb, dist, dt);
       } else {
         lightningContact(state, a, b, ra, rb, dist, dt);
       }
@@ -125,6 +126,7 @@ function samePolarityContact(
   ra: number,
   rb: number,
   dist: number,
+  dt: number,
 ): void {
   const [big, small] = a.mass >= b.mass ? [a, b] : [b, a];
   if (big.mass >= small.mass * ABSORB_RATIO && dist < cloudRadius(big.mass)) {
@@ -145,12 +147,28 @@ function samePolarityContact(
     ny = 0;
   }
   const total = a.mass + b.mass;
-  a.pos.x += nx * overlap * (b.mass / total);
-  a.pos.y += ny * overlap * (b.mass / total);
-  b.pos.x -= nx * overlap * (a.mass / total);
-  b.pos.y -= ny * overlap * (a.mass / total);
-  clampToWorld(a);
-  clampToWorld(b);
+  pushWithWallCrush(state, a, nx * overlap * (b.mass / total), ny * overlap * (b.mass / total), dt);
+  pushWithWallCrush(state, b, -nx * overlap * (a.mass / total), -ny * overlap * (a.mass / total), dt);
+}
+
+/**
+ * 밀어내기 변위를 적용하고, 벽에 눌려 잘린 깊이(squash)에 비례해 질량을 깎는다.
+ * 자발적 이동(moveClouds)의 벽 접촉은 무해 — 압착은 오직 밀어내기로만 발생한다.
+ */
+function pushWithWallCrush(state: GameState, cloud: Cloud, dx: number, dy: number, dt: number): void {
+  cloud.pos.x += dx;
+  cloud.pos.y += dy;
+  const r = cloudRadius(cloud.mass);
+  const clampedX = Math.min(Math.max(cloud.pos.x, r), WORLD_SIZE - r);
+  const clampedY = Math.min(Math.max(cloud.pos.y, r), WORLD_SIZE - r);
+  const squash = Math.hypot(cloud.pos.x - clampedX, cloud.pos.y - clampedY);
+  cloud.pos.x = clampedX;
+  cloud.pos.y = clampedY;
+  if (squash <= 0) return;
+  const loss = cloud.mass * WALL_CRUSH_RATE_PER_SEC * dt * Math.min(1, squash / r);
+  cloud.mass -= loss;
+  scatterDroplets(state, { ...cloud.pos }, loss * DROPLET_RATIO);
+  state.events.push({ type: 'crush', cloudId: cloud.id, pos: { ...cloud.pos } });
 }
 
 function lightningContact(
