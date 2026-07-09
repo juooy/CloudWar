@@ -3,6 +3,7 @@ import type { Vec2 } from '@cloudwar/core';
 import { Controls } from './input';
 import { Camera } from './camera';
 import { render } from './render';
+import { EffectsManager } from './effects';
 import { generateCloudStyle } from './cloudStyle';
 import type { CloudStyle } from './cloudStyle';
 import { showStartScreen } from './startScreen';
@@ -38,9 +39,11 @@ async function start(): Promise<void> {
   const state = createInitialState(Date.now() >>> 0, BOT_COUNT, choice.polarity); // 시드는 core 밖(여기)에서만 생성
   const controls = new Controls(document.body);
   const camera = new Camera();
+  const effects = new EffectsManager();
 
   let prevPositions = new Map<number, Vec2>();
   let last = performance.now();
+  let lastFrame = performance.now();
   let accumulator = 0;
 
   function frame(now: number): void {
@@ -54,10 +57,15 @@ async function start(): Promise<void> {
         [PLAYER_ID]: { dir: controls.currentDir(), swap: controls.consumeSwap() },
       };
       simulate(state, inputs, DT);
+      for (const ev of state.events) effects.add(ev, state, PLAYER_ID);
       accumulator -= DT;
     }
 
+    effects.update((now - lastFrame) / 1000);
+    camera.offset = effects.shakeOffset();
     render(ctx, canvas, state, prevPositions, accumulator / DT, camera, PLAYER_ID, getStyle, now / 1000);
+    effects.draw(ctx, canvas, camera);
+    lastFrame = now;
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
