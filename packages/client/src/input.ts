@@ -2,9 +2,10 @@ import type { Vec2 } from '@cloudwar/core';
 
 const DEADZONE_PX = 24;
 
-/** 마우스 위치 → 화면 중앙 기준 이동 방향. 창 밖이거나 데드존 안이면 {0,0}. */
-export class MouseInput {
+/** 마우스 이동 방향 + 스왑 키(E/Space) 에지 트리거. */
+export class Controls {
   private mouse: Vec2 | null = null;
+  private swapRequested = false;
 
   constructor(target: HTMLElement) {
     target.addEventListener('mousemove', (e: MouseEvent) => {
@@ -12,6 +13,10 @@ export class MouseInput {
     });
     target.addEventListener('mouseleave', () => {
       this.mouse = null;
+    });
+    window.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      if (e.code === 'KeyE' || e.code === 'Space') this.swapRequested = true;
     });
   }
 
@@ -21,5 +26,12 @@ export class MouseInput {
     const dy = this.mouse.y - window.innerHeight / 2;
     if (Math.hypot(dx, dy) < DEADZONE_PX) return { x: 0, y: 0 };
     return { x: dx, y: dy }; // 정규화는 simulate 책임
+  }
+
+  /** 마지막 호출 이후 스왑 키가 눌렸으면 true (1회성) */
+  consumeSwap(): boolean {
+    const requested = this.swapRequested;
+    this.swapRequested = false;
+    return requested;
   }
 }

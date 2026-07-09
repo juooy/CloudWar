@@ -1,6 +1,6 @@
-import { createInitialState, simulate, DT } from '@cloudwar/core';
+import { BOT_COUNT, computeBotInputs, createInitialState, simulate, DT } from '@cloudwar/core';
 import type { Vec2 } from '@cloudwar/core';
-import { MouseInput } from './input';
+import { Controls } from './input';
 import { Camera } from './camera';
 import { render } from './render';
 import { generateCloudStyle } from './cloudStyle';
@@ -20,7 +20,7 @@ function resize(): void {
 window.addEventListener('resize', resize);
 resize();
 
-/** 구름 id → 비주얼 스타일. 플레이어는 시작 화면에서 고른 것, 그 외(봇 등)는 id 시드로 자동 생성. */
+/** 구름 id → 비주얼 스타일. 플레이어는 시작 화면에서 고른 것, 봇은 id 시드로 자동 생성. */
 const styleCache = new Map<number, CloudStyle>();
 function getStyle(id: number): CloudStyle {
   let style = styleCache.get(id);
@@ -32,11 +32,11 @@ function getStyle(id: number): CloudStyle {
 }
 
 async function start(): Promise<void> {
-  const playerStyle = await showStartScreen();
-  styleCache.set(PLAYER_ID, playerStyle);
+  const choice = await showStartScreen();
+  styleCache.set(PLAYER_ID, choice.style);
 
-  const state = createInitialState(Date.now() >>> 0); // 시드는 core 밖(여기)에서만 생성
-  const input = new MouseInput(document.body);
+  const state = createInitialState(Date.now() >>> 0, BOT_COUNT, choice.polarity); // 시드는 core 밖(여기)에서만 생성
+  const controls = new Controls(document.body);
   const camera = new Camera();
 
   let prevPositions = new Map<number, Vec2>();
@@ -49,7 +49,11 @@ async function start(): Promise<void> {
 
     while (accumulator >= DT) {
       prevPositions = new Map(state.clouds.map((c) => [c.id, { ...c.pos }]));
-      simulate(state, { [PLAYER_ID]: { dir: input.currentDir() } }, DT);
+      const inputs = {
+        ...computeBotInputs(state),
+        [PLAYER_ID]: { dir: controls.currentDir(), swap: controls.consumeSwap() },
+      };
+      simulate(state, inputs, DT);
       accumulator -= DT;
     }
 
